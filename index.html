@@ -1,0 +1,396 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#2563eb">
+  <title>My Wallet</title>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f1f5f9;color:#172033}
+    header{background:#2563eb;color:white;padding:35px 20px 25px;border-radius:0 0 25px 25px}
+    header h1{margin:0;font-size:29px}
+    header p{margin:7px 0 0;opacity:.9}
+    main{max-width:600px;margin:auto;padding:18px}
+    .stats{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+    .stat,.panel,.item{background:white;border-radius:16px;padding:17px;box-shadow:0 2px 8px #00000009}
+    .stat strong{display:block;font-size:27px;color:#2563eb;margin-top:7px}
+    input,select,textarea{width:100%;padding:13px;border:1px solid #cbd5e1;border-radius:10px;font-size:16px;margin:6px 0 14px;background:white}
+    label{font-weight:600;font-size:14px}
+    button{border:0;border-radius:11px;padding:13px 16px;font-size:15px;font-weight:600;cursor:pointer}
+    .primary{background:#2563eb;color:white;width:100%}
+    .secondary{background:#e2e8f0;color:#172033}
+    .danger{background:#fee2e2;color:#b91c1c}
+    .tabs{display:flex;gap:8px;margin:16px 0}
+    .tabs button{flex:1;background:white}
+    .tabs button.active{background:#2563eb;color:white}
+    .item{margin:12px 0;display:flex;align-items:center;gap:12px;cursor:pointer}
+    .item .emoji{font-size:29px}
+    .item .info{flex:1;min-width:0}
+    .item small{display:block;color:#64748b;margin-top:5px}
+    .item .name{font-weight:700;overflow-wrap:anywhere}
+    .panel{margin-top:15px}
+    .hidden{display:none!important}
+    .actions{display:flex;gap:8px;margin-top:12px}
+    .actions button{flex:1}
+    .muted{color:#64748b;font-size:13px}
+    .codebox{background:white;border-radius:14px;padding:18px;text-align:center;overflow:auto}
+    #barcode{max-width:100%}
+    #qrcode{display:flex;justify-content:center}
+    #qrcode canvas,#qrcode img{max-width:100%;height:auto}
+    .checkout{position:fixed;inset:0;background:white;z-index:20;display:flex;flex-direction:column;justify-content:center;padding:20px;text-align:center}
+    .checkout .codebox{width:100%;margin:18px auto}
+    .checkout h2{overflow-wrap:anywhere}
+    .checkout .close{position:absolute;top:20px;right:20px}
+    .checkout svg{max-width:100%}
+    .empty{text-align:center;color:#64748b;padding:35px 10px}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>💳 My Wallet</h1>
+    <p>我的会员卡与凭证</p>
+  </header>
+
+  <main>
+    <section id="home">
+      <div class="stats">
+        <div class="stat">会员卡<strong id="cardCount">0</strong></div>
+        <div class="stat">凭证<strong id="voucherCount">0</strong></div>
+      </div>
+
+      <button class="primary" onclick="showForm()">＋ 添加会员卡或凭证</button>
+
+      <div class="tabs">
+        <button class="active" onclick="setTab('all',this)">全部</button>
+        <button onclick="setTab('card',this)">会员卡</button>
+        <button onclick="setTab('voucher',this)">凭证</button>
+      </div>
+
+      <input id="search" placeholder="🔍 搜索会员卡或凭证" oninput="renderList()">
+      <div id="list"></div>
+    </section>
+
+    <section id="formPage" class="panel hidden">
+      <h2 id="formTitle">添加新资料</h2>
+
+      <label>类型</label>
+      <select id="type">
+        <option value="card">会员卡</option>
+        <option value="voucher">凭证</option>
+      </select>
+
+      <label>名称 *</label>
+      <input id="name" placeholder="例如：超市会员卡">
+
+      <label>条码类型</label>
+      <select id="format">
+        <option value="CODE128">Code 128 条形码</option>
+        <option value="EAN13">EAN-13 条形码</option>
+        <option value="EAN8">EAN-8 条形码</option>
+        <option value="UPC">UPC-A 条形码</option>
+        <option value="CODE39">Code 39 条形码</option>
+        <option value="QR">二维码 QR Code</option>
+        <option value="NONE">不需要条码</option>
+      </select>
+
+      <label>会员号码 / 兑换码</label>
+      <input id="code" placeholder="输入卡上的真实号码">
+
+      <label>有效期（可选）</label>
+      <input id="expiry" type="date">
+
+      <label>备注（可选）</label>
+      <textarea id="note" rows="3" placeholder="使用条件或其他说明"></textarea>
+
+      <button class="primary" onclick="saveItem()">保存资料</button>
+      <button class="secondary" style="width:100%;margin-top:10px" onclick="showHome()">取消</button>
+    </section>
+
+    <section id="detail" class="panel hidden">
+      <h2 id="detailName"></h2>
+      <p id="detailInfo" class="muted"></p>
+
+      <div class="codebox" id="codeArea">
+        <svg id="barcode"></svg>
+        <div id="qrcode"></div>
+        <p id="plainCode"></p>
+      </div>
+
+      <p id="detailNote"></p>
+      <div class="actions">
+        <button class="primary" onclick="showCheckout()">放大显示</button>
+        <button class="secondary" onclick="editItem()">编辑</button>
+      </div>
+      <div class="actions">
+        <button class="secondary" onclick="showHome()">返回</button>
+        <button class="danger" onclick="deleteItem()">删除</button>
+      </div>
+    </section>
+  </main>
+
+  <div id="checkout" class="checkout hidden">
+    <button class="secondary close" onclick="closeCheckout()">✕ 关闭</button>
+    <h2 id="checkoutName"></h2>
+    <div class="codebox">
+      <svg id="bigBarcode"></svg>
+      <div id="bigQR"></div>
+      <p id="bigCode"></p>
+    </div>
+    <p class="muted">请向收银员出示此画面</p>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.12.1/dist/JsBarcode.all.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+  <script>
+    const KEY="my_wallet_v1";
+    let items=[];
+    let tab="all";
+    let currentId=null;
+    let editingId=null;
+
+    try {
+      const saved=JSON.parse(localStorage.getItem(KEY)||"[]");
+      items=Array.isArray(saved)?saved:[];
+    } catch(e) {
+      alert("读取本地资料失败，请不要清除浏览器数据。");
+    }
+
+    function persist(){
+      try{
+        localStorage.setItem(KEY,JSON.stringify(items));
+        return true;
+      }catch(e){
+        alert("保存失败：手机储存空间可能不足。");
+        return false;
+      }
+    }
+
+    function hidePages(){
+      ["home","formPage","detail"].forEach(id=>{
+        document.getElementById(id).classList.add("hidden");
+      });
+    }
+
+    function showHome(){
+      hidePages();
+      document.getElementById("home").classList.remove("hidden");
+      renderList();
+    }
+
+    function showForm(id=null){
+      editingId=id;
+      hidePages();
+      document.getElementById("formPage").classList.remove("hidden");
+      document.getElementById("formTitle").textContent=id?"编辑资料":"添加新资料";
+
+      const item=items.find(x=>x.id===id);
+      document.getElementById("type").value=item?.type||"card";
+      document.getElementById("name").value=item?.name||"";
+      document.getElementById("format").value=item?.format||"CODE128";
+      document.getElementById("code").value=item?.code||"";
+      document.getElementById("expiry").value=item?.expiry||"";
+      document.getElementById("note").value=item?.note||"";
+    }
+
+    function setTab(value,button){
+      tab=value;
+      document.querySelectorAll(".tabs button").forEach(b=>b.classList.remove("active"));
+      button.classList.add("active");
+      renderList();
+    }
+
+    function renderList(){
+      const list=document.getElementById("list");
+      const q=document.getElementById("search").value.toLowerCase();
+
+      document.getElementById("cardCount").textContent=items.filter(x=>x.type==="card").length;
+      document.getElementById("voucherCount").textContent=items.filter(x=>x.type==="voucher").length;
+
+      const filtered=items.filter(x=>
+        (tab==="all"||x.type===tab)&&
+        x.name.toLowerCase().includes(q)
+      );
+
+      list.replaceChildren();
+
+      if(!filtered.length){
+        const empty=document.createElement("div");
+        empty.className="empty";
+        empty.textContent="这里还没有会员卡或凭证";
+        list.appendChild(empty);
+        return;
+      }
+
+      filtered.forEach(item=>{
+        const row=document.createElement("div");
+        row.className="item";
+        row.onclick=()=>openItem(item.id);
+
+        const emoji=document.createElement("span");
+        emoji.className="emoji";
+        emoji.textContent=item.type==="card"?"💳":"🎟️";
+
+        const info=document.createElement("div");
+        info.className="info";
+
+        const name=document.createElement("div");
+        name.className="name";
+        name.textContent=item.name;
+
+        const small=document.createElement("small");
+        small.textContent=item.expiry?"有效期："+item.expiry:(item.type==="card"?"会员卡":"凭证");
+
+        info.append(name,small);
+        const arrow=document.createElement("span");
+        arrow.textContent="›";
+        row.append(emoji,info,arrow);
+        list.appendChild(row);
+      });
+    }
+
+    function validCode(format,value){
+      if(format==="NONE")return true;
+      if(!value)return false;
+      if(format==="QR")return true;
+
+      if(typeof JsBarcode==="undefined")return false;
+
+      try{
+        JsBarcode(document.createElementNS("http://www.w3.org/2000/svg","svg"),value,{
+          format:format,
+          displayValue:false
+        });
+        return true;
+      }catch(e){
+        return false;
+      }
+    }
+
+    function saveItem(){
+      const type=document.getElementById("type").value;
+      const name=document.getElementById("name").value.trim();
+      const format=document.getElementById("format").value;
+      const code=document.getElementById("code").value.trim();
+      const expiry=document.getElementById("expiry").value;
+      const note=document.getElementById("note").value.trim();
+
+      if(!name){
+        alert("请输入名称");
+        return;
+      }
+
+      if(!validCode(format,code)){
+        alert("编码无效或条码程序未加载。请检查号码与条码格式。");
+        return;
+      }
+
+      const item={
+        id:editingId||crypto.randomUUID(),
+        type,name,format,code,expiry,note
+      };
+
+      const next=editingId
+        ?items.map(x=>x.id===editingId?item:x)
+        :[item,...items];
+
+      const old=items;
+      items=next;
+
+      if(!persist()){
+        items=old;
+        return;
+      }
+
+      showHome();
+    }
+
+    function drawCode(item,barcodeId,qrId,textId){
+      const svg=document.getElementById(barcodeId);
+      const qr=document.getElementById(qrId);
+      const label=document.getElementById(textId);
+
+      svg.replaceChildren();
+      qr.replaceChildren();
+      label.textContent=item.code||"没有号码";
+
+      svg.style.display="none";
+      qr.style.display="none";
+
+      if(item.format==="NONE")return;
+
+      try{
+        if(item.format==="QR"){
+          if(typeof QRCode==="undefined")throw Error("QR library missing");
+          qr.style.display="flex";
+          new QRCode(qr,{
+            text:item.code,
+            width:220,
+            height:220,
+            correctLevel:QRCode.CorrectLevel.M
+          });
+        }else{
+          if(typeof JsBarcode==="undefined")throw Error("Barcode library missing");
+          svg.style.display="inline-block";
+          JsBarcode(svg,item.code,{
+            format:item.format,
+            displayValue:false,
+            margin:12,
+            width:2,
+            height:100
+          });
+        }
+      }catch(e){
+        label.textContent="无法生成条码，请检查格式或网络连接。号码："+item.code;
+      }
+    }
+
+    function openItem(id){
+      const item=items.find(x=>x.id===id);
+      if(!item)return;
+
+      currentId=id;
+      hidePages();
+      document.getElementById("detail").classList.remove("hidden");
+      document.getElementById("detailName").textContent=item.name;
+      document.getElementById("detailInfo").textContent=
+        (item.type==="card"?"会员卡":"凭证")+
+        (item.expiry?" · 有效期："+item.expiry:"");
+      document.getElementById("detailNote").textContent=item.note;
+      drawCode(item,"barcode","qrcode","plainCode");
+    }
+
+    function showCheckout(){
+      const item=items.find(x=>x.id===currentId);
+      if(!item)return;
+      document.getElementById("checkout").classList.remove("hidden");
+      document.getElementById("checkoutName").textContent=item.name;
+      drawCode(item,"bigBarcode","bigQR","bigCode");
+    }
+
+    function closeCheckout(){
+      document.getElementById("checkout").classList.add("hidden");
+    }
+
+    function editItem(){
+      showForm(currentId);
+    }
+
+    function deleteItem(){
+      if(!confirm("确定删除这张卡片或凭证吗？"))return;
+      const old=items;
+      items=items.filter(x=>x.id!==currentId);
+      if(!persist()){
+        items=old;
+        return;
+      }
+      currentId=null;
+      showHome();
+    }
+
+    renderList();
+  </script>
+</body>
+</html>
